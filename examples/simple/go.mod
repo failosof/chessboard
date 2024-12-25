@@ -19,3 +19,5 @@ require (
 	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 )
+
+replace github.com/failosof/chessboard v0.0.0-20241225182612-a1672820d26f => ../../

@@ -1,4 +1,4 @@
-package theme
+package config
 
 import (
 	"fmt"
@@ -14,12 +14,12 @@ type PieceCache struct {
 	Size  int
 }
 
-type PiecesTheme struct {
+type PiecesStyle struct {
 	pieces []image.Image
 	cache  []PieceCache
 }
 
-func LoadPiecesTheme(dir string) (t PiecesTheme, err error) {
+func LoadPiecesStyle(dir string) (t PiecesStyle, err error) {
 	t.pieces = make([]image.Image, 13)
 	t.cache = make([]PieceCache, 13)
 
@@ -42,7 +42,7 @@ func LoadPiecesTheme(dir string) (t PiecesTheme, err error) {
 	return
 }
 
-func (t *PiecesTheme) ImageFor(piece chess.Piece, size int) (img image.Image) {
+func (t *PiecesStyle) ImageFor(piece chess.Piece, size int) (img image.Image) {
 	cache := t.cache[piece]
 	if cache.Size == size {
 		return cache.Image

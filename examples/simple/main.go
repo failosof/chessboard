@@ -11,8 +11,7 @@ import (
 	"gioui.org/op/paint"
 	"gioui.org/unit"
 	"github.com/failosof/chessboard"
-	"github.com/failosof/chessboard/theme"
-	"github.com/failosof/chessboard/util"
+	"github.com/failosof/chessboard/config"
 )
 
 func main() {
@@ -28,18 +27,15 @@ func main() {
 }
 
 func draw(window *app.Window) error {
-	filename := "assets/board/brown.png"
-	img, err := util.OpenImage(filename)
+	th, err := config.Load("assets/board/brown.png", "assets/pieces/aquarium")
 	if err != nil {
 		return err
 	}
 
-	pt, err := theme.LoadPiecesTheme("assets/pieces/aquarium")
-	if err != nil {
-		return err
-	}
+	th.ShowLegalMoves = true
+	th.ShowLastMove = true
 
-	board := chessboard.NewWidget(img, pt)
+	board := chessboard.NewWidget(th)
 
 	var ops op.Ops
 	for {
@@ -53,7 +49,7 @@ func draw(window *app.Window) error {
 				func(gtx layout.Context) layout.Dimensions {
 					return layout.UniformInset(unit.Dp(10)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 						defer clip.Rect{Max: gtx.Constraints.Min}.Push(gtx.Ops).Pop()
-						paint.Fill(gtx.Ops, chessboard.BackgroundColor)
+						paint.Fill(gtx.Ops, chessboard.GrayColor)
 						return layout.Dimensions{Size: gtx.Constraints.Min}
 					})
 				},
