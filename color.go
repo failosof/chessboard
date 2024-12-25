@@ -1,0 +1,11 @@
+package main
+
+import "image/color"
+
+var (
+	GrayColor       = color.NRGBA{R: 0x80, G: 0x80, B: 0x80, A: 0xFF}
+	BackgroundColor = color.NRGBA{R: 0xC0, G: 0xC0, B: 0xC0, A: 0xFF}
+	RedColor        = color.NRGBA{R: 0xC0, G: 0x40, B: 0x40, A: 0xFF}
+	GreenColor      = color.NRGBA{R: 0x40, G: 0xC0, B: 0x40, A: 0xFF}
+	BlueColor       = color.NRGBA{R: 0x40, G: 0x40, B: 0xC0, A: 0xFF}
+)
