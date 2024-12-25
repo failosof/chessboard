@@ -88,34 +88,6 @@ func (w *Widget) Layout(gtx layout.Context) layout.Dimensions {
 	pointer.CursorPointer.Add(gtx.Ops)
 	event.Op(gtx.Ops, w)
 
-	//for {
-	//	ev, ok := gtx.Event(pointer.Filter{
-	//		Target: w,
-	//		Kinds:  pointer.Move,
-	//	})
-	//	if !ok {
-	//		break
-	//	}
-	//
-	//	if e, ok := ev.(pointer.Event); ok {
-	//		square := NewSquare(e.Position, w.squareSize)
-	//		if !square.Equal(w.prevSquare) {
-	//			w.prevSquare = square
-	//			hintMacro := op.Record(w.hintCache)
-	//			offset := op.Offset(square.Center.Sub(w.hintCenter)).Push(w.hintCache)
-	//			selection := clip.Ellipse{Max: w.hint}.Push(w.hintCache)
-	//			paint.ColorOp{Color: GrayColor}.Add(w.hintCache)
-	//			paint.PaintOp{}.Add(w.hintCache)
-	//			selection.Pop()
-	//			offset.Pop()
-	//			w.hintDrawingOp = hintMacro.Stop()
-	//			slog.Debug("new", "square", square.String())
-	//		}
-	//	}
-	//}
-
-	//w.hintDrawingOp.Add(gtx.Ops)
-
 	w.drawPieces(gtx)
 
 	return layout.Dimensions{Size: boardSize}
