@@ -2,12 +2,15 @@ package config
 
 import (
 	"fmt"
+	"image/color"
 	"time"
 )
 
 type Chessboard struct {
 	ShowLegalMoves bool
 	ShowLastMove   bool
+	HintColor      color.NRGBA
+	LastMoveColor  color.NRGBA
 	AnimationSpeed time.Duration
 	BoardStyle     BoardStyle
 	PiecesStyle    PiecesStyle

@@ -18,11 +18,6 @@ import (
 	"github.com/notnil/chess"
 )
 
-var (
-	hintColor = Transparentize(GrayColor, 0.5)
-	moveColor = Transparentize(YellowColor, 0.7)
-)
-
 type Widget struct {
 	config config.Chessboard
 
@@ -143,10 +138,12 @@ func (w *Widget) drawPieces(gtx layout.Context) {
 	imageSize := util.Floor(w.squareSize)
 	pieceSize := image.Pt(imageSize, imageSize)
 
-	lastMove := w.getLastMove()
-	if lastMove != nil {
-		w.markSquare(gtx, lastMove.S1(), moveColor)
-		w.markSquare(gtx, lastMove.S2(), moveColor)
+	if w.config.ShowLastMove {
+		lastMove := w.getLastMove()
+		if lastMove != nil {
+			w.markSquare(gtx, lastMove.S1(), w.config.LastMoveColor)
+			w.markSquare(gtx, lastMove.S2(), w.config.LastMoveColor)
+		}
 	}
 
 	// todo: add flip support
@@ -191,10 +188,10 @@ func (w *Widget) drawPieces(gtx layout.Context) {
 							Min: position,
 							Max: position.Add(w.hintSize.Round()),
 						}
-						util.DrawEllipse(gtx.Ops, rect, hintColor)
+						util.DrawEllipse(gtx.Ops, rect, w.config.HintColor)
 					} else {
 						rect := image.Rectangle{Min: position, Max: position.Add(pieceSize)}
-						util.DrawRectangle(gtx.Ops, rect, w.squareSize/10, hintColor)
+						util.DrawRectangle(gtx.Ops, rect, w.squareSize/10, w.config.HintColor)
 					}
 				}
 			}
