@@ -1,4 +1,4 @@
-package main
+package chessboard
 
 import (
 	"fmt"
@@ -22,14 +22,13 @@ type Widget struct {
 	originalImage image.Image
 	piecesTheme   theme.PiecesTheme
 
+	curSize         int
+	prevSize        int
+	squareSize      float32
 	halfPointerSize f32.Point
-
-	curSize    int
-	prevSize   int
-	squareSize float32
-
-	hint       image.Point
-	hintCenter image.Point
+	halfPieceSize   f32.Point
+	hintSize        f32.Point
+	hintCenter      f32.Point
 
 	boardDrawingOp   op.CallOp
 	hintDrawingOp    op.CallOp
@@ -67,14 +66,14 @@ func (w *Widget) Layout(gtx layout.Context) layout.Dimensions {
 
 		img := util.ResizeImage(w.originalImage, w.curSize, w.curSize)
 		w.squareSize = float32(img.Bounds().Dx()) / 8
+		w.halfPieceSize = f32.Pt(w.squareSize, w.squareSize).Div(2)
 		cache := new(op.Ops)
 		boardMacro := op.Record(cache)
 		util.DrawImage(cache, img, image.Point{})
 		w.boardDrawingOp = boardMacro.Stop()
 
-		hintSize := util.Round(w.squareSize / 3)
-		w.hint = image.Pt(hintSize, hintSize)
-		w.hintCenter = w.hint.Div(2)
+		w.hintSize = f32.Pt(w.squareSize, w.squareSize).Div(3)
+		w.hintCenter = w.hintSize.Div(2)
 
 		for square := chess.A1; square <= chess.H8; square++ {
 			w.squareOriginCoordinates[square] = SquareToPosition(square, w.squareSize).Round()
@@ -135,6 +134,10 @@ func (w *Widget) drawPieces(gtx layout.Context) {
 		squareDrawingOp.Add(gtx.Ops)
 	}
 
+	if w.game.Outcome() != chess.NoOutcome {
+		return
+	}
+
 	if w.selectedSquare != chess.NoSquare {
 		img := w.piecesTheme.ImageFor(w.selectedPiece, imageSize)
 		// todo: draw selection
@@ -160,28 +163,29 @@ func (w *Widget) drawPieces(gtx layout.Context) {
 		}
 
 		if e, ok := ev.(pointer.Event); ok {
-			square := NewSquare(e.Position, w.squareSize).ToChess()
-			piece := curPosition.Board().Piece(square)
+			hoveredSquare := NewSquare(e.Position, w.squareSize).ToChess()
+			hoveredPiece := curPosition.Board().Piece(hoveredSquare)
 			switch e.Kind {
 			case pointer.Move:
-				if w.selectedSquare == chess.NoSquare && piece.Color() == curPosition.Turn() {
-					slog.Debug("hovering", "piece", piece.String())
+				if w.selectedSquare == chess.NoSquare && hoveredPiece.Color() == curPosition.Turn() {
+					slog.Debug("hovering", "piece", hoveredPiece.String())
 					pointer.CursorGrab.Add(gtx.Ops)
 				}
 			case pointer.Press:
-				if w.selectedSquare == chess.NoSquare && piece != chess.NoPiece && piece.Color() == curPosition.Turn() {
+				if w.selectedSquare == chess.NoSquare && hoveredPiece.Color() == curPosition.Turn() {
 					pointer.CursorGrabbing.Add(gtx.Ops)
-					name := fmt.Sprintf("%s %s", piece.Color().Name(), piece.Type().String())
+					name := fmt.Sprintf("%s %s", hoveredPiece.Color().Name(), hoveredPiece.Type().String())
 					slog.Debug("selected", "piece", name)
-					w.selectedPiece = piece
-					w.selectedSquare = square
-					w.draggingPos = e.Position.Sub(f32.Pt(w.squareSize, w.squareSize).Div(2)).Round()
+					w.dragID = e.PointerID
+					w.selectedPiece = hoveredPiece
+					w.selectedSquare = hoveredSquare
+					w.draggingPos = e.Position.Add(w.halfPointerSize).Sub(w.halfPieceSize).Round()
+					gtx.Execute(op.InvalidateCmd{At: gtx.Now.Add(time.Second / 30)})
 				}
 			case pointer.Drag:
-				if w.selectedSquare != chess.NoSquare {
+				if w.dragID != e.PointerID || w.selectedSquare != chess.NoSquare {
 					pointer.CursorGrabbing.Add(gtx.Ops)
-					halfPieceSize := f32.Pt(w.squareSize, w.squareSize).Div(2)
-					w.draggingPos = e.Position.Add(w.halfPointerSize).Sub(halfPieceSize).Round()
+					w.draggingPos = e.Position.Add(w.halfPointerSize).Sub(w.halfPieceSize).Round()
 					if e.Priority < pointer.Grabbed {
 						gtx.Execute(pointer.GrabCmd{
 							Tag: w.selectedSquare,
@@ -191,8 +195,9 @@ func (w *Widget) drawPieces(gtx layout.Context) {
 				}
 			case pointer.Release:
 				if w.selectedSquare != chess.NoSquare {
-					slog.Debug("released", "piece", w.selectedPiece, "on", square.String())
-					if err := w.game.MoveStr(w.selectedSquare.String() + square.String()); err == nil {
+					slog.Debug("released", "piece", w.selectedPiece, "on", hoveredSquare.String())
+					move := w.selectedSquare.String() + hoveredSquare.String()
+					if err := w.game.MoveStr(move); err == nil {
 						w.dragID = 0
 						w.draggingPos = image.Point{}
 						w.selectedSquare = chess.NoSquare
@@ -200,8 +205,6 @@ func (w *Widget) drawPieces(gtx layout.Context) {
 						pointer.CursorPointer.Add(gtx.Ops)
 						gtx.Execute(op.InvalidateCmd{At: gtx.Now.Add(time.Second / 10)})
 						continue
-					} else {
-						slog.Error("move", "error", err)
 					}
 				}
 				fallthrough
