@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"gioui.org/f32"
+	"github.com/failosof/chessboard/union"
 	"github.com/failosof/chessboard/util"
 	"github.com/notnil/chess"
 )
@@ -43,8 +44,8 @@ func (s Square) ToChess() chess.Square {
 	return chess.NewSquare(chess.File(file), chess.Rank(rank))
 }
 
-func SquareToPosition(square chess.Square, size float32) f32.Point {
+func SquareToPoint(square chess.Square, size float32) union.Point {
 	letter := float32(square%8) * size
 	number := float32(7-square/8) * size
-	return f32.Pt(letter, number)
+	return union.PointFromFloatPx(letter, number)
 }

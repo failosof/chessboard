@@ -1,8 +1,10 @@
 package util
 
 import (
+	"image"
 	"math"
 
+	"gioui.org/f32"
 	"golang.org/x/exp/constraints"
 )
 
@@ -20,4 +22,8 @@ func Min[T constraints.Ordered](a, b T) T {
 	} else {
 		return b
 	}
+}
+
+func ToF32(pt image.Point) f32.Point {
+	return f32.Point{X: float32(pt.X), Y: float32(pt.Y)}
 }

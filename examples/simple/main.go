@@ -37,8 +37,8 @@ func draw(window *app.Window) error {
 
 	th.ShowLegalMoves = true
 	th.ShowLastMove = true
-	th.HintColor = chessboard.Transparentize(chessboard.GrayColor, 0.5)
-	th.LastMoveColor = chessboard.Transparentize(chessboard.YellowColor, 0.7)
+	th.HintColor = chessboard.Transparentize(chessboard.GrayColor, 0.7)
+	th.LastMoveColor = chessboard.Transparentize(chessboard.YellowColor, 0.5)
 
 	board := chessboard.NewWidget(th)
 
