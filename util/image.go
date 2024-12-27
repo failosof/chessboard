@@ -4,8 +4,6 @@ import (
 	"image"
 	_ "image/png"
 	"os"
-
-	"github.com/nfnt/resize"
 )
 
 func OpenImage(filename string) (image.Image, error) {
@@ -18,6 +16,9 @@ func OpenImage(filename string) (image.Image, error) {
 	return img, err
 }
 
-func ResizeImage(img image.Image, width, height int) image.Image {
-	return resize.Resize(uint(width), uint(height), img, resize.Lanczos3)
+func Rect(origin, size image.Point) image.Rectangle {
+	return image.Rectangle{
+		Min: origin,
+		Max: origin.Add(size),
+	}
 }

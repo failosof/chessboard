@@ -22,7 +22,6 @@ type BoardStyle struct {
 	Coordinates Coordinates
 	Background  color.Color
 	Size        int
-	cachedImage image.Image
 }
 
 func LoadBoardStyle(filename string) (b BoardStyle, err error) {
@@ -32,17 +31,6 @@ func LoadBoardStyle(filename string) (b BoardStyle, err error) {
 	}
 
 	b.Image = img
-	b.cachedImage = img
 	b.Size = img.Bounds().Dx()
-	return
-}
-
-func (b *BoardStyle) ImageFor(size int) (img image.Image) {
-	if b.Size == size {
-		return b.cachedImage
-	}
-
-	img = util.ResizeImage(b.Image, size, size)
-	b.cachedImage = img
 	return
 }

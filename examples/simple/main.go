@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"gioui.org/app"
 	"gioui.org/layout"
@@ -10,6 +12,7 @@ import (
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
+	"gioui.org/widget/material"
 	"github.com/failosof/chessboard"
 	"github.com/failosof/chessboard/config"
 )
@@ -39,6 +42,25 @@ func draw(window *app.Window) error {
 
 	board := chessboard.NewWidget(th)
 
+	mth := material.NewTheme()
+
+	var frameCount int
+	var fps float64
+	startTime := time.Now()
+
+	// Frame ticker for FPS calculation
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	go func() {
+		for range ticker.C {
+			elapsed := time.Since(startTime).Seconds()
+			fps = float64(frameCount) / elapsed
+			frameCount = 0
+			startTime = time.Now()
+		}
+	}()
+
 	var ops op.Ops
 	for {
 		switch e := window.Event().(type) {
@@ -46,6 +68,7 @@ func draw(window *app.Window) error {
 			return e.Err
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
+			gtx.Execute(op.InvalidateCmd{})
 			layout.Background{}.Layout(
 				gtx,
 				func(gtx layout.Context) layout.Dimensions {
@@ -56,12 +79,24 @@ func draw(window *app.Window) error {
 					})
 				},
 				func(gtx layout.Context) layout.Dimensions {
-					return layout.UniformInset(unit.Dp(20)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-						return board.Layout(gtx)
-					})
+					return layout.Flex{}.Layout(
+						gtx,
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							return layout.UniformInset(unit.Dp(20)).Layout(gtx, board.Layout)
+						}),
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							return layout.UniformInset(unit.Dp(20)).Layout(
+								gtx,
+								func(gtx layout.Context) layout.Dimensions {
+									return material.H4(mth, fmt.Sprintf("FPS: %.2f", fps)).Layout(gtx)
+								},
+							)
+						}),
+					)
 				},
 			)
 			e.Frame(gtx.Ops)
+			frameCount++
 		}
 	}
 }

@@ -42,17 +42,6 @@ func LoadPiecesStyle(dir string) (t PiecesStyle, err error) {
 	return
 }
 
-func (t *PiecesStyle) ImageFor(piece chess.Piece, size int) (img image.Image) {
-	cache := t.cache[piece]
-	if cache.Size == size {
-		return cache.Image
-	}
-
-	img = t.pieces[piece]
-	img = util.ResizeImage(img, size, size)
-	cache.Image = img
-	cache.Size = size
-	t.cache[piece] = cache
-
-	return
+func (t *PiecesStyle) ImageFor(piece chess.Piece) (img image.Image) {
+	return t.pieces[piece]
 }

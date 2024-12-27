@@ -33,8 +33,8 @@ func (s Square) String() string {
 	return letter + number
 }
 
-func (s Square) Equal(prev Square) bool {
-	return prev.Letter == s.Letter && prev.Number == s.Number
+func (a Square) Equal(b Square) bool {
+	return a.Letter == b.Letter && a.Number == b.Number
 }
 
 func (s Square) ToChess() chess.Square {

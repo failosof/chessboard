@@ -4,16 +4,18 @@ import (
 	"image"
 	"image/color"
 
+	"gioui.org/f32"
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 )
 
-func DrawImage(ops *op.Ops, img image.Image, at image.Point) {
+func DrawImage(ops *op.Ops, img image.Image, at image.Point, factor f32.Point) {
 	imageOp := paint.NewImageOp(img)
 	offset := op.Offset(at).Push(ops)
 	imageOp.Filter = paint.FilterLinear
 	imageOp.Add(ops)
+	op.Affine(f32.Affine2D{}.Scale(f32.Point{}, factor)).Add(ops)
 	paint.PaintOp{}.Add(ops)
 	offset.Pop()
 }
