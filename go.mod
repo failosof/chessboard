@@ -1,6 +1,6 @@
 module github.com/failosof/chessboard
 
-go 1.22
+go 1.22.9
 
 require (
 	gioui.org v0.7.1
