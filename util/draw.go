@@ -76,6 +76,7 @@ func DrawCross(ops *op.Ops, rect image.Rectangle, width float32, color color.NRG
 
 func DrawArrow(ops *op.Ops, start, end image.Point, squareSize f32.Point, width float32, color color.NRGBA) {
 	arrowHeadSize := width * 4
+	lineStartOffset := arrowHeadSize * 0.8
 	lineEndOffset := arrowHeadSize * 0.2
 
 	halfSquareSize := squareSize.Div(2)
@@ -86,8 +87,8 @@ func DrawArrow(ops *op.Ops, start, end image.Point, squareSize f32.Point, width 
 	angle := math.Atan2(float64(vector.Y), float64(vector.X))
 
 	lineStart := f32.Pt(
-		startCenter.X+float32(math.Cos(angle))*(halfSquareSize.X-lineEndOffset),
-		startCenter.Y+float32(math.Sin(angle))*(halfSquareSize.Y-lineEndOffset),
+		startCenter.X+float32(math.Cos(angle))*(halfSquareSize.X-lineStartOffset),
+		startCenter.Y+float32(math.Sin(angle))*(halfSquareSize.Y-lineStartOffset),
 	)
 	lineEnd := f32.Pt(
 		endCenter.X-float32(math.Cos(angle))*(arrowHeadSize+lineEndOffset),

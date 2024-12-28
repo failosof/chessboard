@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
@@ -34,8 +34,9 @@ type Widget struct {
 	buttonPressed pointer.Buttons
 	modifiersUsed key.Modifiers
 
-	annotations []*Annotation
+	annoType    AnnoType
 	drawingAnno Annotation
+	annotations []*Annotation
 
 	squareOrigins []union.Point
 
@@ -66,6 +67,7 @@ func NewWidget(config Config) *Widget {
 		squareDrawingOps:  make([]*op.CallOp, 64),
 		selectedSquare:    chess.NoSquare,
 		selectedPiece:     chess.NoPiece,
+		annoType:          CircleAnno,
 	}
 
 	w.curBoardSize = union.SizeFromMinPt(config.BoardImage.Bounds().Max)
@@ -152,10 +154,10 @@ func (w *Widget) Layout(gtx layout.Context) layout.Dimensions {
 
 	for _, anno := range w.annotations {
 		anno.Scale(resizeFactor)
-		anno.Draw(gtx, w.squareSize, w.resized())
+		anno.Draw(gtx, w.squareOrigins, w.squareSize, w.resized())
 	}
 	w.drawingAnno.Scale(resizeFactor)
-	w.drawingAnno.Draw(gtx, w.squareSize, w.resized())
+	w.drawingAnno.Draw(gtx, w.squareOrigins, w.squareSize, w.drawingAnno.Type != NoAnno)
 
 	for {
 		ev, ok := gtx.Event(pointer.Filter{
@@ -282,7 +284,6 @@ func (w *Widget) drawPieces(gtx layout.Context) {
 func (w *Widget) processPrimaryButtonClick(gtx layout.Context, e pointer.Event) {
 	hoveredSquare := NewSquare(e.Position, w.squareSize.Float).ToChess()
 	if hoveredSquare == chess.NoSquare {
-		w.unselectPiece(gtx)
 		return
 	}
 	hoveredPiece := w.game.Position().Board().Piece(hoveredSquare)
@@ -327,18 +328,54 @@ func (w *Widget) processPrimaryButtonClick(gtx layout.Context, e pointer.Event) 
 
 func (w *Widget) processSecondaryButtonClick(gtx layout.Context, e pointer.Event) {
 	hoveredSquare := NewSquare(e.Position, w.squareSize.Float).ToChess()
+	defer gtx.Execute(op.InvalidateCmd{At: gtx.Now.Add(time.Second / 30)})
 
 	switch e.Kind {
 	case pointer.Press:
-		w.drawingAnno = Annotation{
-			Type:  CrossAnno,
-			Start: w.squareOrigins[hoveredSquare],
-			Color: util.Transparentize(w.config.Color.Primary, 0.5),
-			Width: union.SizeFromFloat(w.squareSize.Float / 9),
+		if hoveredSquare != chess.NoSquare {
+			w.drawingAnno = Annotation{
+				Type:  CrossAnno,
+				Start: hoveredSquare,
+				Color: util.Transparentize(w.selectAnnotationColor(), 0.5),
+				Width: union.SizeFromFloat(w.squareSize.Float / 9),
+			}
+			w.dragID = e.PointerID
 		}
-		gtx.Execute(op.InvalidateCmd{At: gtx.Now.Add(time.Second / 30)})
 	case pointer.Release:
-	case pointer.Cancel:
+		w.drawingAnno.Width = union.SizeFromFloat(w.squareSize.Float / 7)
+		w.drawingAnno.Color = w.selectAnnotationColor()
+		if hoveredSquare != chess.NoSquare {
+			w.drawingAnno.End = hoveredSquare
+		}
+
+		i := slices.IndexFunc(w.annotations, func(annotation *Annotation) bool {
+			if w.drawingAnno.Type == NoAnno {
+				return annotation.Start == hoveredSquare
+			} else {
+				if w.drawingAnno.Type == ArrowAnno {
+					return annotation.Type == ArrowAnno &&
+						annotation.Start == w.drawingAnno.Start && annotation.End == w.drawingAnno.End
+				} else {
+					return annotation.Start == w.drawingAnno.Start
+				}
+			}
+		})
+
+		anno := w.drawingAnno.Copy()
+		if i > -1 {
+			if w.annotations[i].Equal(&w.drawingAnno) {
+				w.annotations = slices.Delete(w.annotations, i, i+1)
+			} else {
+				w.annotations[i] = &anno
+			}
+		} else {
+			w.annotations = append(w.annotations, &anno)
+		}
+
+		w.drawingAnno = Annotation{}
+		w.dragID = 0
+		w.buttonPressed = 0
+		w.modifiersUsed = 0
 	}
 }
 
@@ -354,7 +391,20 @@ func (w *Widget) processPrimaryButtonDragging(gtx layout.Context, e pointer.Even
 }
 
 func (w *Widget) processSecondaryButtonDragging(gtx layout.Context, e pointer.Event) {
-	slog.Info("hi")
+	if w.drawingAnno.Type != NoAnno {
+		hoveredSquare := NewSquare(e.Position, w.squareSize.Float).ToChess()
+		if hoveredSquare != chess.NoSquare {
+			if w.dragID == e.PointerID {
+				w.drawingAnno.End = hoveredSquare
+				if w.drawingAnno.Start == w.drawingAnno.End {
+					w.drawingAnno.Type = w.annoType
+				} else {
+					w.drawingAnno.Type = ArrowAnno
+				}
+				gtx.Execute(op.InvalidateCmd{})
+			}
+		}
+	}
 }
 
 func (w *Widget) selectPiece(gtx layout.Context, e pointer.Event, piece chess.Piece, square chess.Square) {
@@ -390,7 +440,6 @@ func (w *Widget) unselectPiece(gtx layout.Context) {
 	w.dragID = 0
 
 	pointer.CursorPointer.Add(gtx.Ops)
-
 	gtx.Execute(op.InvalidateCmd{At: gtx.Now.Add(time.Second / 25)})
 }
 
@@ -415,5 +464,21 @@ func (w *Widget) markSquare(gtx layout.Context, square chess.Square, color color
 	if square != chess.NoSquare {
 		origin := w.squareOrigins[square]
 		util.DrawPane(gtx.Ops, util.Rect(origin.Pt, w.squareSize.Pt), color)
+	}
+}
+
+func (w *Widget) selectAnnotationColor() color.NRGBA {
+	if w.modifiersUsed == 0 {
+		return w.config.Color.Primary
+	}
+
+	if w.modifiersUsed&key.ModAlt == key.ModAlt {
+		return w.config.Color.Warning
+	} else if w.modifiersUsed&key.ModShift == key.ModShift {
+		return w.config.Color.Info
+	} else if w.modifiersUsed&key.ModCtrl == key.ModCtrl {
+		return w.config.Color.Danger
+	} else {
+		return w.config.Color.Primary
 	}
 }

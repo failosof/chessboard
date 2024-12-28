@@ -5,11 +5,13 @@ import (
 
 	"gioui.org/f32"
 	"github.com/failosof/chessboard/util"
+	"github.com/notnil/chess"
 )
 
 type Point struct {
-	Pt  image.Point
-	F32 f32.Point
+	Pt     image.Point
+	F32    f32.Point
+	Square chess.Square
 }
 
 func PointFromIntPx(x, y int) Point {
