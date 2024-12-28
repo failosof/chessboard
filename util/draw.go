@@ -53,66 +53,74 @@ func DrawCircle(ops *op.Ops, rect image.Rectangle, width float32, color color.NR
 }
 
 func DrawCross(ops *op.Ops, rect image.Rectangle, width float32, color color.NRGBA) {
-	halfWidth := Round(width / 2)
-
-	diag1 := clip.Rect{
-		Min: image.Point{X: rect.Min.X, Y: rect.Min.Y + halfWidth},
-		Max: image.Point{X: rect.Max.X, Y: rect.Max.Y - halfWidth},
-	}
+	offsetPt := f32.Pt(width, width).Mul(0.7)
+	var aPath clip.Path
+	aPath.Begin(ops)
+	aPath.MoveTo(ToF32(rect.Min).Add(offsetPt))
+	aPath.LineTo(ToF32(rect.Max).Sub(offsetPt))
 	paint.FillShape(ops, color, clip.Stroke{
-		Path:  diag1.Path(),
+		Path:  aPath.End(),
 		Width: width,
 	}.Op())
 
-	diag2 := clip.Rect{
-		Min: image.Point{X: rect.Min.X, Y: rect.Min.Y - halfWidth},
-		Max: image.Point{X: rect.Max.X, Y: rect.Max.Y + halfWidth},
-	}
+	offset := offsetPt.Round().X
+	var bPath clip.Path
+	bPath.Begin(ops)
+	bPath.MoveTo(f32.Pt(float32(rect.Max.X-offset), float32(rect.Min.Y+offset)))
+	bPath.LineTo(f32.Pt(float32(rect.Min.X+offset), float32(rect.Max.Y-offset)))
 	paint.FillShape(ops, color, clip.Stroke{
-		Path:  diag2.Path(),
+		Path:  bPath.End(),
 		Width: width,
 	}.Op())
 }
 
 func DrawArrow(ops *op.Ops, start, end image.Point, squareSize f32.Point, width float32, color color.NRGBA) {
-	const arrowHeadSize = 15
+	arrowHeadSize := width * 4
+	lineEndOffset := arrowHeadSize * 0.2
 
 	halfSquareSize := squareSize.Div(2)
 	startCenter := ToF32(start).Add(halfSquareSize)
 	endCenter := ToF32(end).Add(halfSquareSize)
 
 	vector := endCenter.Sub(startCenter)
-	angle := math.Atan2(float64(vector.X), float64(vector.Y))
+	angle := math.Atan2(float64(vector.Y), float64(vector.X))
+
+	lineStart := f32.Pt(
+		startCenter.X+float32(math.Cos(angle))*(halfSquareSize.X-lineEndOffset),
+		startCenter.Y+float32(math.Sin(angle))*(halfSquareSize.Y-lineEndOffset),
+	)
+	lineEnd := f32.Pt(
+		endCenter.X-float32(math.Cos(angle))*(arrowHeadSize+lineEndOffset),
+		endCenter.Y-float32(math.Sin(angle))*(arrowHeadSize+lineEndOffset),
+	)
+
+	var linePath clip.Path
+	linePath.Begin(ops)
+	linePath.MoveTo(lineStart)
+	linePath.LineTo(lineEnd)
+	paint.FillShape(ops, color, clip.Stroke{
+		Path:  linePath.End(),
+		Width: width,
+	}.Op())
 
 	headBase := f32.Pt(
 		endCenter.X-float32(math.Cos(angle))*arrowHeadSize,
 		endCenter.Y-float32(math.Sin(angle))*arrowHeadSize,
 	)
-
-	line := clip.Rect{
-		Min: startCenter.Round(),
-		Max: headBase.Round(),
-	}
-	paint.FillShape(ops, color, clip.Stroke{
-		Path:  line.Path(),
-		Width: width,
-	}.Op())
-
 	headLeft := f32.Pt(
-		headBase.X-float32(math.Cos(angle+math.Pi/2))*arrowHeadSize/2,
-		headBase.Y-float32(math.Sin(angle+math.Pi/2))*arrowHeadSize/2,
+		headBase.X-float32(math.Cos(angle+math.Pi/2))*(arrowHeadSize/2),
+		headBase.Y-float32(math.Sin(angle+math.Pi/2))*(arrowHeadSize/2),
 	)
 	headRight := f32.Pt(
-		headBase.X-float32(math.Cos(angle-math.Pi/2))*arrowHeadSize/2,
-		headBase.Y-float32(math.Sin(angle-math.Pi/2))*arrowHeadSize/2,
+		headBase.X-float32(math.Cos(angle-math.Pi/2))*(arrowHeadSize/2),
+		headBase.Y-float32(math.Sin(angle-math.Pi/2))*(arrowHeadSize/2),
 	)
 
-	var path clip.Path
-	path.Begin(ops)
-	path.MoveTo(headLeft)
-	path.LineTo(endCenter)
-	path.LineTo(headRight)
-	path.Close()
-
-	paint.FillShape(ops, color, clip.Outline{Path: path.End()}.Op())
+	var headPath clip.Path
+	headPath.Begin(ops)
+	headPath.MoveTo(headLeft)
+	headPath.LineTo(endCenter)
+	headPath.LineTo(headRight)
+	headPath.Close()
+	paint.FillShape(ops, color, clip.Outline{Path: headPath.End()}.Op())
 }

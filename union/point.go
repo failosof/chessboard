@@ -23,10 +23,6 @@ func PointFromFloatPx(x, y float32) Point {
 	}
 }
 
-func PointFromPt(pt image.Point) Point {
-	return PointFromIntPx(pt.X, pt.Y)
-}
-
 func PointFromF32(pt f32.Point) Point {
 	return PointFromFloatPx(pt.X, pt.Y)
 }

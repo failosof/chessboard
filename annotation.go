@@ -12,8 +12,7 @@ import (
 type AnnoType int8
 
 const (
-	SolidAnno AnnoType = iota
-	RectAnno
+	RectAnno AnnoType = iota
 	CircleAnno
 	CrossAnno
 	ArrowAnno
@@ -42,8 +41,6 @@ func (a *Annotation) Draw(gtx layout.Context, squareSize union.Size, redraw bool
 
 		annoRect := util.Rect(a.Start.Pt, squareSize.Pt)
 		switch a.Type {
-		case SolidAnno:
-			util.DrawPane(cache, annoRect, a.Color)
 		case RectAnno:
 			util.DrawRectangle(cache, annoRect, a.Width.Float, a.Color)
 		case CircleAnno:

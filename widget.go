@@ -268,12 +268,48 @@ func (w *Widget) drawPieces(gtx layout.Context) {
 
 func (w *Widget) processRightClick(gtx layout.Context, e pointer.Event, hoveredSquare chess.Square) {
 	slog.Debug("marking", "square", hoveredSquare, "pos", e.Position)
-	w.annotations = []*Annotation{{
-		Type:  CircleAnno,
-		Start: SquareToPoint(hoveredSquare, w.squareSize.Float),
-		Color: YellowColor,
-		Width: union.SizeFromFloat(w.squareSize.Float / 10),
-	}}
+	w.annotations = []*Annotation{
+		//{
+		//	Type:  CrossAnno,
+		//	Start: SquareToPoint(hoveredSquare, w.squareSize.Float),
+		//	Color: Transparentize(RedColor, 0.9),
+		//	Width: union.SizeFromFloat(w.squareSize.Float / 7),
+		//},
+		{
+			Type:  CircleAnno,
+			Start: SquareToPoint(hoveredSquare, w.squareSize.Float),
+			Color: Transparentize(BlueColor, 0.9),
+			Width: union.SizeFromFloat(w.squareSize.Float / 7),
+		},
+		//{
+		//	Type:  ArrowAnno,
+		//	Start: SquareToPoint(hoveredSquare, w.squareSize.Float),
+		//	End:   SquareToPoint(chess.A8, w.squareSize.Float),
+		//	Color: Transparentize(GreenColor, 0.7),
+		//	Width: union.SizeFromFloat(w.squareSize.Float / 5),
+		//},
+		//{
+		//	Type:  ArrowAnno,
+		//	Start: SquareToPoint(hoveredSquare, w.squareSize.Float),
+		//	End:   SquareToPoint(chess.H8, w.squareSize.Float),
+		//	Color: Transparentize(BlueColor, 0.7),
+		//	Width: union.SizeFromFloat(w.squareSize.Float / 5),
+		//},
+		//{
+		//	Type:  ArrowAnno,
+		//	Start: SquareToPoint(hoveredSquare, w.squareSize.Float),
+		//	End:   SquareToPoint(chess.A1, w.squareSize.Float),
+		//	Color: Transparentize(RedColor, 0.7),
+		//	Width: union.SizeFromFloat(w.squareSize.Float / 5),
+		//},
+		//{
+		//	Type:  ArrowAnno,
+		//	Start: SquareToPoint(hoveredSquare, w.squareSize.Float),
+		//	End:   SquareToPoint(chess.H1, w.squareSize.Float),
+		//	Color: Transparentize(YellowColor, 0.7),
+		//	Width: union.SizeFromFloat(w.squareSize.Float / 5),
+		//},
+	}
 }
 
 func (w *Widget) processLeftClick(
