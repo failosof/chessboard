@@ -285,6 +285,7 @@ func (w *Widget) processPrimaryButtonClick(gtx layout.Context, e pointer.Event) 
 		w.unselectPiece(gtx)
 		return
 	}
+	hoveredPiece := w.game.Position().Board().Piece(hoveredSquare)
 
 	switch e.Kind {
 	case pointer.Press:
@@ -292,31 +293,27 @@ func (w *Widget) processPrimaryButtonClick(gtx layout.Context, e pointer.Event) 
 		w.annotations = nil
 		w.drawingAnno.Type = NoAnno
 
-		hoveredPiece := w.game.Position().Board().Piece(hoveredSquare)
-		if hoveredPiece != chess.NoPiece {
-			pointer.CursorGrabbing.Add(gtx.Ops)
-			w.dragID = e.PointerID
-			w.selectedPiece = hoveredPiece
-			w.selectedSquare = hoveredSquare
-			w.draggingPos = union.PointFromF32(e.Position.Add(w.halfPointerSize.F32).Sub(w.halfPieceSize.F32))
-			gtx.Execute(op.InvalidateCmd{At: gtx.Now.Add(time.Second / 25)})
-		}
-
-		if w.selectedSquare == hoveredSquare {
-			w.unselectPiece(gtx)
-			return
+		if w.selectedPiece == chess.NoPiece || w.selectedPiece.Color() == hoveredPiece.Color() {
+			if hoveredPiece != chess.NoPiece {
+				w.selectPiece(gtx, e, hoveredPiece, hoveredSquare)
+				return
+			}
 		}
 
 		fallthrough
 	case pointer.Release:
 		if w.selectedSquare == hoveredSquare {
-			w.putPieceBack(gtx)
+			w.putSelectedPieceBack(gtx)
 			return
 		}
 
 		if w.selectedSquare != chess.NoSquare {
 			if err := w.moveSelectedPieceTo(hoveredSquare); err != nil {
-				w.putPieceBack(gtx)
+				w.putSelectedPieceBack(gtx)
+				if hoveredPiece != chess.NoPiece {
+					w.selectPiece(gtx, e, hoveredPiece, hoveredSquare)
+					return
+				}
 			}
 		}
 
@@ -360,16 +357,21 @@ func (w *Widget) processSecondaryButtonDragging(gtx layout.Context, e pointer.Ev
 	slog.Info("hi")
 }
 
-func (w *Widget) moveSelectedPieceTo(to chess.Square) error {
-	if w.selectedSquare == chess.NoSquare {
-		return fmt.Errorf("no square selected")
-	} else {
-		move := w.selectedSquare.String() + to.String()
-		return w.game.MoveStr(move)
+func (w *Widget) selectPiece(gtx layout.Context, e pointer.Event, piece chess.Piece, square chess.Square) {
+	if piece != chess.NoPiece && square != chess.NoSquare {
+		pointer.CursorGrabbing.Add(gtx.Ops)
+		w.dragID = e.PointerID
+		w.selectedPiece = piece
+		w.selectedSquare = square
+		w.draggingPos = union.PointFromF32(e.Position.Add(w.halfPointerSize.F32).Sub(w.halfPieceSize.F32))
+		gtx.Execute(pointer.GrabCmd{
+			Tag: w.selectedSquare,
+			ID:  w.dragID,
+		})
 	}
 }
 
-func (w *Widget) putPieceBack(gtx layout.Context) {
+func (w *Widget) putSelectedPieceBack(gtx layout.Context) {
 	if w.selectedSquare != chess.NoSquare {
 		w.draggingPos = w.squareOrigins[w.selectedSquare]
 	}
@@ -398,6 +400,15 @@ func (w *Widget) getLastMove() (m *chess.Move) {
 		m = moves[len(moves)-1]
 	}
 	return
+}
+
+func (w *Widget) moveSelectedPieceTo(to chess.Square) error {
+	if w.selectedSquare == chess.NoSquare {
+		return fmt.Errorf("no square selected")
+	} else {
+		move := w.selectedSquare.String() + to.String()
+		return w.game.MoveStr(move)
+	}
 }
 
 func (w *Widget) markSquare(gtx layout.Context, square chess.Square, color color.NRGBA) {

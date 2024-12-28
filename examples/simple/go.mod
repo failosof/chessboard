@@ -1,10 +1,10 @@
 module simple
 
-go 1.23.4
+go 1.23
 
 require (
 	gioui.org v0.7.1
-	github.com/failosof/chessboard v0.0.0-20241228010127-3ba6c150663c
+	github.com/failosof/chessboard v0.0.0-20241228194647-20eb3d4b2c8f
 )
 
 require (
@@ -19,4 +19,4 @@ require (
 	golang.org/x/text v0.16.0 // indirect
 )
 
-replace github.com/failosof/chessboard v0.0.0-20241228010127-3ba6c150663c => ../../
+replace github.com/failosof/chessboard v0.0.0-20241228194647-20eb3d4b2c8f => ../../
