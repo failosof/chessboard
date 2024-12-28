@@ -41,7 +41,12 @@ func (a Square) Equal(b Square) bool {
 func (s Square) ToChess() chess.Square {
 	rank := 7 - s.Number
 	file := s.Letter
-	return chess.NewSquare(chess.File(file), chess.Rank(rank))
+
+	if (0 <= rank && rank < 8) && (0 <= file && file < 8) {
+		return chess.NewSquare(chess.File(file), chess.Rank(rank))
+	} else {
+		return chess.NoSquare
+	}
 }
 
 func SquareToPoint(square chess.Square, size float32) union.Point {

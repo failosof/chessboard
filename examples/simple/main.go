@@ -14,7 +14,7 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget/material"
 	"github.com/failosof/chessboard"
-	"github.com/failosof/chessboard/config"
+	"github.com/failosof/chessboard/util"
 )
 
 func main() {
@@ -30,19 +30,17 @@ func main() {
 }
 
 func draw(window *app.Window) error {
-	th, err := config.Load("assets/board/brown.png", "assets/pieces/aquarium")
+	config, err := chessboard.NewConfig("assets/board/brown.png", "assets/pieces/aquarium")
 	if err != nil {
 		return err
 	}
 
-	th.ShowLegalMoves = true
-	th.ShowLastMove = true
-	th.HintColor = chessboard.Transparentize(chessboard.GrayColor, 0.7)
-	th.LastMoveColor = chessboard.Transparentize(chessboard.YellowColor, 0.5)
+	config.ShowHints = true
+	config.ShowLastMove = true
 
-	board := chessboard.NewWidget(th)
+	board := chessboard.NewWidget(config)
 
-	mth := material.NewTheme()
+	th := material.NewTheme()
 
 	var frameCount int
 	var fps float64
@@ -74,7 +72,7 @@ func draw(window *app.Window) error {
 				func(gtx layout.Context) layout.Dimensions {
 					return layout.UniformInset(unit.Dp(10)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 						defer clip.Rect{Max: gtx.Constraints.Min}.Push(gtx.Ops).Pop()
-						paint.Fill(gtx.Ops, chessboard.GrayColor)
+						paint.Fill(gtx.Ops, util.GrayColor)
 						return layout.Dimensions{Size: gtx.Constraints.Min}
 					})
 				},
@@ -88,7 +86,7 @@ func draw(window *app.Window) error {
 							return layout.UniformInset(unit.Dp(20)).Layout(
 								gtx,
 								func(gtx layout.Context) layout.Dimensions {
-									return material.H4(mth, fmt.Sprintf("FPS: %.2f", fps)).Layout(gtx)
+									return material.H4(th, fmt.Sprintf("FPS: %.2f", fps)).Layout(gtx)
 								},
 							)
 						}),

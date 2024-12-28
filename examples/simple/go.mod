@@ -1,6 +1,6 @@
 module simple
 
-go 1.23.4
+go 1.22
 
 require (
 	gioui.org v0.7.1

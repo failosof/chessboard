@@ -1,4 +1,4 @@
-package chessboard
+package util
 
 import "image/color"
 
