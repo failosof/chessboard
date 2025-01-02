@@ -23,8 +23,7 @@ func DrawImage(ops *op.Ops, img image.Image, at image.Point, factor f32.Point) {
 
 func DrawPane(ops *op.Ops, rect image.Rectangle, color color.NRGBA) {
 	defer clip.Rect(rect).Push(ops).Pop()
-	paint.ColorOp{Color: color}.Add(ops)
-	paint.PaintOp{}.Add(ops)
+	paint.Fill(ops, color)
 }
 
 func DrawRectangle(ops *op.Ops, rect image.Rectangle, width float32, color color.NRGBA) {
@@ -39,8 +38,7 @@ func DrawRectangle(ops *op.Ops, rect image.Rectangle, width float32, color color
 
 func DrawEllipse(ops *op.Ops, rect image.Rectangle, color color.NRGBA) {
 	defer clip.Ellipse(rect).Push(ops).Pop()
-	paint.ColorOp{Color: color}.Add(ops)
-	paint.PaintOp{}.Add(ops)
+	paint.Fill(ops, color)
 }
 
 func DrawCircle(ops *op.Ops, rect image.Rectangle, width float32, color color.NRGBA) {

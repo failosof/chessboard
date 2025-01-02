@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"gioui.org/f32"
 	"gioui.org/io/event"
 	"gioui.org/io/key"
 	"gioui.org/io/pointer"
@@ -22,14 +23,12 @@ import (
 type Widget struct {
 	config Config
 
-	curBoardSize    union.Size
-	prevBoardSize   union.Size
-	squareSize      union.Size
-	halfPointerSize union.Size
-	halfPieceSize   union.Size
-	hintSize        union.Size
-
-	hintCenter union.Point
+	curWidgetSize union.Size
+	curBoardSize  union.Size
+	prevBoardSize union.Size
+	squareSize    union.Size
+	hintSize      union.Size
+	pointerSize   union.Size
 
 	buttonPressed pointer.Buttons
 	modifiersUsed key.Modifiers
@@ -42,6 +41,7 @@ type Widget struct {
 
 	pieceEventTargets []event.Filter
 
+	coordsDrawingOp  op.CallOp
 	boardDrawingOp   op.CallOp
 	hintDrawingOp    op.CallOp
 	squareDrawingOps []*op.CallOp
@@ -61,7 +61,7 @@ func NewWidget(config Config) *Widget {
 	w := Widget{
 		game:              chess.NewGame(chess.UseNotation(chess.UCINotation{})),
 		config:            config,
-		halfPointerSize:   union.SizeFromInt(16 / 2), // assume for now
+		pointerSize:       union.SizeFromInt(16), // assume for now
 		squareOrigins:     make([]union.Point, 64),
 		pieceEventTargets: make([]event.Filter, 64),
 		squareDrawingOps:  make([]*op.CallOp, 64),
@@ -73,14 +73,11 @@ func NewWidget(config Config) *Widget {
 	w.curBoardSize = union.SizeFromMinPt(config.BoardImage.Bounds().Max)
 	w.prevBoardSize = w.curBoardSize
 	w.squareSize = union.SizeFromFloat(w.curBoardSize.Float / 8)
-	w.halfPieceSize = union.SizeFromMinF32(w.squareSize.F32.Div(2))
 	w.hintSize = union.SizeFromMinF32(w.squareSize.F32.Div(3))
-
-	w.hintCenter = union.PointFromF32(w.hintSize.F32.Div(2))
 	w.draggingPos = union.PointFromF32(w.draggingPos.F32)
 
 	for square := chess.A1; square <= chess.H8; square++ {
-		w.squareOrigins[square] = SquareToPoint(square, w.squareSize.Float)
+		w.squareOrigins[square] = union.PointFromF32(util.SquareToPoint(square, w.squareSize.Float))
 	}
 
 	return &w
@@ -102,21 +99,18 @@ func (w *Widget) Layout(gtx layout.Context) layout.Dimensions {
 	}()
 
 	if w.resized() {
+		w.squareSize.Scale(resizeFactor)
+		w.hintSize.Scale(resizeFactor)
+		w.draggingPos.Scale(resizeFactor)
+		for square := chess.A1; square <= chess.H8; square++ {
+			w.squareOrigins[square].Scale(resizeFactor)
+		}
+
 		cache := new(op.Ops)
 		boardMacro := op.Record(cache)
 		factor := w.curBoardSize.F32.Div(w.config.BoardImageSize.Float)
 		util.DrawImage(cache, w.config.BoardImage, image.Point{}, factor)
 		w.boardDrawingOp = boardMacro.Stop()
-
-		w.squareSize.Scale(resizeFactor)
-		w.halfPieceSize.Scale(resizeFactor)
-		w.hintSize.Scale(resizeFactor)
-		w.hintCenter.Scale(resizeFactor)
-		w.draggingPos.Scale(resizeFactor)
-
-		for square := chess.A1; square <= chess.H8; square++ {
-			w.squareOrigins[square].Scale(resizeFactor)
-		}
 	}
 
 	w.boardDrawingOp.Add(gtx.Ops)
@@ -139,7 +133,7 @@ func (w *Widget) Layout(gtx layout.Context) layout.Dimensions {
 				if move.S1() == w.selectedSquare {
 					position := w.squareOrigins[move.S2()]
 					if curPosition.Board().Piece(move.S2()) == chess.NoPiece {
-						origin := position.F32.Add(w.halfPieceSize.F32).Sub(w.hintCenter.F32).Round()
+						origin := position.F32.Add(w.squareSize.Half.F32).Sub(w.hintSize.Half.F32).Round()
 						util.DrawEllipse(gtx.Ops, util.Rect(origin, w.hintSize.Pt), w.config.Color.Hint)
 					} else {
 						rect := util.Rect(position.Pt, w.squareSize.Pt)
@@ -220,7 +214,7 @@ func (w *Widget) SetGame(game *chess.Game) {
 }
 
 func (w *Widget) resized() bool {
-	return w.curBoardSize != w.prevBoardSize
+	return !w.curBoardSize.Eq(w.prevBoardSize)
 }
 
 func (w *Widget) positionChanged() bool {
@@ -282,7 +276,7 @@ func (w *Widget) drawPieces(gtx layout.Context) {
 }
 
 func (w *Widget) processPrimaryButtonClick(gtx layout.Context, e pointer.Event) {
-	hoveredSquare := NewSquare(e.Position, w.squareSize.Float).ToChess()
+	hoveredSquare := util.PointToSquare(e.Position, w.squareSize.Float)
 	if hoveredSquare == chess.NoSquare {
 		return
 	}
@@ -327,14 +321,14 @@ func (w *Widget) processPrimaryButtonClick(gtx layout.Context, e pointer.Event) 
 }
 
 func (w *Widget) processSecondaryButtonClick(gtx layout.Context, e pointer.Event) {
-	hoveredSquare := NewSquare(e.Position, w.squareSize.Float).ToChess()
+	hoveredSquare := util.PointToSquare(e.Position, w.squareSize.Float)
 	defer gtx.Execute(op.InvalidateCmd{At: gtx.Now.Add(time.Second / 30)})
 
 	switch e.Kind {
 	case pointer.Press:
 		if hoveredSquare != chess.NoSquare {
 			w.drawingAnno = Annotation{
-				Type:  CrossAnno,
+				Type:  w.annoType,
 				Start: hoveredSquare,
 				Color: util.Transparentize(w.selectAnnotationColor(), 0.5),
 				Width: union.SizeFromFloat(w.squareSize.Float / 9),
@@ -382,17 +376,13 @@ func (w *Widget) processSecondaryButtonClick(gtx layout.Context, e pointer.Event
 func (w *Widget) processPrimaryButtonDragging(gtx layout.Context, e pointer.Event) {
 	if w.dragID == e.PointerID && w.selectedSquare != chess.NoSquare {
 		pointer.CursorGrabbing.Add(gtx.Ops)
-		w.draggingPos = union.PointFromF32(e.Position.Add(w.halfPointerSize.F32).Sub(w.halfPieceSize.F32))
-		gtx.Execute(pointer.GrabCmd{
-			Tag: w.selectedSquare,
-			ID:  w.dragID,
-		})
+		w.dragTo(gtx, e.Position)
 	}
 }
 
 func (w *Widget) processSecondaryButtonDragging(gtx layout.Context, e pointer.Event) {
 	if w.drawingAnno.Type != NoAnno {
-		hoveredSquare := NewSquare(e.Position, w.squareSize.Float).ToChess()
+		hoveredSquare := util.PointToSquare(e.Position, w.squareSize.Float)
 		if hoveredSquare != chess.NoSquare {
 			if w.dragID == e.PointerID {
 				w.drawingAnno.End = hoveredSquare
@@ -413,12 +403,16 @@ func (w *Widget) selectPiece(gtx layout.Context, e pointer.Event, piece chess.Pi
 		w.dragID = e.PointerID
 		w.selectedPiece = piece
 		w.selectedSquare = square
-		w.draggingPos = union.PointFromF32(e.Position.Add(w.halfPointerSize.F32).Sub(w.halfPieceSize.F32))
-		gtx.Execute(pointer.GrabCmd{
-			Tag: w.selectedSquare,
-			ID:  w.dragID,
-		})
+		w.dragTo(gtx, e.Position)
 	}
+}
+
+func (w *Widget) dragTo(gtx layout.Context, pos f32.Point) {
+	w.draggingPos = union.PointFromF32(pos.Add(w.pointerSize.Half.F32).Sub(w.squareSize.Half.F32))
+	gtx.Execute(pointer.GrabCmd{
+		Tag: w.selectedSquare,
+		ID:  w.dragID,
+	})
 }
 
 func (w *Widget) putSelectedPieceBack(gtx layout.Context) {
