@@ -15,20 +15,29 @@ import (
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/op/clip"
+	"gioui.org/widget/material"
 	"github.com/failosof/chessboard/union"
 	"github.com/failosof/chessboard/util"
 	"github.com/notnil/chess"
 )
 
+// todo: add coordinates
+// todo: add pawn promotion
+// todo: add flip support
+// todo: animations
+
 type Widget struct {
+	th *material.Theme
+
 	config Config
 
-	curWidgetSize union.Size
-	curBoardSize  union.Size
-	prevBoardSize union.Size
-	squareSize    union.Size
-	hintSize      union.Size
-	pointerSize   union.Size
+	curWidgetSize  union.Size
+	prevWidgetSize union.Size
+	curBoardSize   union.Size
+	prevBoardSize  union.Size
+	squareSize     union.Size
+	hintSize       union.Size
+	pointerSize    union.Size
 
 	buttonPressed pointer.Buttons
 	modifiersUsed key.Modifiers
@@ -57,9 +66,9 @@ type Widget struct {
 	mu sync.Mutex
 }
 
-func NewWidget(config Config) *Widget {
+func NewWidget(th *material.Theme, config Config) *Widget {
 	w := Widget{
-		game:              chess.NewGame(chess.UseNotation(chess.UCINotation{})),
+		th:                th,
 		config:            config,
 		pointerSize:       union.SizeFromInt(16), // assume for now
 		squareOrigins:     make([]union.Point, 64),
@@ -68,42 +77,44 @@ func NewWidget(config Config) *Widget {
 		selectedSquare:    chess.NoSquare,
 		selectedPiece:     chess.NoPiece,
 		annoType:          CircleAnno,
-	}
-
-	w.curBoardSize = union.SizeFromMinPt(config.BoardImage.Bounds().Max)
-	w.prevBoardSize = w.curBoardSize
-	w.squareSize = union.SizeFromFloat(w.curBoardSize.Float / 8)
-	w.hintSize = union.SizeFromMinF32(w.squareSize.F32.Div(3))
-	w.draggingPos = union.PointFromF32(w.draggingPos.F32)
-
-	for square := chess.A1; square <= chess.H8; square++ {
-		w.squareOrigins[square] = union.PointFromF32(util.SquareToPoint(square, w.squareSize.Float))
+		game:              chess.NewGame(chess.UseNotation(chess.UCINotation{})),
 	}
 
 	return &w
 }
 
 func (w *Widget) Layout(gtx layout.Context) layout.Dimensions {
+	w.curWidgetSize = union.SizeFromMinPt(gtx.Constraints.Max)
+	if w.prevWidgetSize.IsZero() {
+		w.prevWidgetSize = w.curWidgetSize
+	}
+
+	defer func() { w.prevWidgetSize = w.curWidgetSize }()
+
+	if w.config.Coordinates == OutsideCoordinates {
+		resizeFactor := w.curWidgetSize.Float / w.prevWidgetSize.Float
+		return OutsideCoordinatesStyle{
+			th:       w.th,
+			fontSize: 16 * resizeFactor,
+			board:    w.layout,
+		}.Layout(gtx)
+	}
+	return w.layout(gtx)
+}
+
+func (w *Widget) layout(gtx layout.Context) layout.Dimensions {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	// todo: add flip support
-
-	curPosition := w.game.Position()
 	w.curBoardSize = union.SizeFromMinPt(gtx.Constraints.Max)
-	resizeFactor := w.curBoardSize.Float / w.prevBoardSize.Float
-
-	defer func() {
-		w.prevBoardSize = w.curBoardSize
-		w.prevPosition = curPosition
-	}()
 
 	if w.resized() {
-		w.squareSize.Scale(resizeFactor)
-		w.hintSize.Scale(resizeFactor)
-		w.draggingPos.Scale(resizeFactor)
+		w.squareSize = union.SizeFromFloat(w.curBoardSize.Float / 8)
+		w.hintSize = union.SizeFromMinF32(w.squareSize.F32.Div(3))
+		w.draggingPos = union.PointFromF32(w.draggingPos.F32)
+
 		for square := chess.A1; square <= chess.H8; square++ {
-			w.squareOrigins[square].Scale(resizeFactor)
+			w.squareOrigins[square] = union.PointFromF32(util.SquareToPoint(square, w.squareSize.Float))
 		}
 
 		cache := new(op.Ops)
@@ -126,6 +137,7 @@ func (w *Widget) Layout(gtx layout.Context) layout.Dimensions {
 		}
 	}
 
+	curPosition := w.game.Position()
 	if w.selectedSquare != chess.NoSquare && w.selectedPiece.Color() == curPosition.Turn() {
 		w.markSquare(gtx, w.selectedSquare, util.GrayColor)
 		if w.config.ShowHints {
@@ -147,11 +159,14 @@ func (w *Widget) Layout(gtx layout.Context) layout.Dimensions {
 	w.drawPieces(gtx)
 
 	for _, anno := range w.annotations {
-		anno.Scale(resizeFactor)
+		anno.Width = union.SizeFromFloat(w.squareSize.Float / 7)
 		anno.Draw(gtx, w.squareOrigins, w.squareSize, w.resized())
 	}
-	w.drawingAnno.Scale(resizeFactor)
+	w.drawingAnno.Width = union.SizeFromFloat(w.squareSize.Float / 9)
 	w.drawingAnno.Draw(gtx, w.squareOrigins, w.squareSize, w.drawingAnno.Type != NoAnno)
+
+	w.prevPosition = w.game.Position()
+	w.prevBoardSize = w.curBoardSize
 
 	for {
 		ev, ok := gtx.Event(pointer.Filter{
@@ -227,7 +242,6 @@ func (w *Widget) drawPieces(gtx layout.Context) {
 	}
 
 	curPosition := w.game.Position()
-
 	if w.resized() || w.positionChanged() {
 		clear(w.squareDrawingOps)
 		var wg sync.WaitGroup
@@ -237,9 +251,9 @@ func (w *Widget) drawPieces(gtx layout.Context) {
 				wg.Add(1)
 				go func(square chess.Square, piece chess.Piece) {
 					defer wg.Done()
+					factor := w.squareSize.F32.Div(w.config.PieceImageSizes[piece].Float)
 					cache := new(op.Ops)
 					squareMacro := op.Record(cache)
-					factor := w.squareSize.F32.Div(w.config.PieceImageSizes[piece].Float)
 					util.DrawImage(cache, w.config.PieceImages[piece], origin.Pt, factor)
 					ops := squareMacro.Stop()
 					w.squareDrawingOps[square] = &ops

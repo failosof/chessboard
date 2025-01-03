@@ -2,6 +2,7 @@ package union
 
 import (
 	"image"
+	"math"
 
 	"gioui.org/f32"
 	"github.com/failosof/chessboard/util"
@@ -28,8 +29,11 @@ func PointFromF32(pt f32.Point) Point {
 }
 
 func (p *Point) Scale(factor float32) {
-	p.F32 = p.F32.Mul(factor)
-	p.Pt = p.F32.Round()
+	f := float64(factor)
+	if !math.IsNaN(f) && !math.IsInf(f, 0) {
+		p.F32 = p.F32.Mul(factor)
+		p.Pt = p.F32.Round()
+	}
 }
 
 func (p Point) String() string {

@@ -21,3 +21,10 @@ func SquareToPoint(square chess.Square, size float32) f32.Point {
 	rank := float32(7-square/8) * size
 	return f32.Pt(file, rank)
 }
+
+func SquareColor(square chess.Square) chess.Color {
+	if ((square / 8) % 2) == (square % 2) {
+		return chess.Black
+	}
+	return chess.White
+}

@@ -8,11 +8,15 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-func Round(val float32) int {
+type Float interface {
+	float32 | float64
+}
+
+func Round[F Float](val F) int {
 	return int(math.Round(float64(val)))
 }
 
-func Floor(val float32) int {
+func Floor[F Float](val F) int {
 	return int(math.Floor(float64(val)))
 }
 

@@ -2,6 +2,7 @@ package union
 
 import (
 	"image"
+	"math"
 
 	"gioui.org/f32"
 	"github.com/failosof/chessboard/util"
@@ -60,12 +61,15 @@ func SizeFromMinF32(pt f32.Point) Size {
 }
 
 func (s *Size) Scale(factor float32) {
-	s.Float *= factor
-	s.Int = util.Round(s.Float)
-	s.F32.X, s.F32.Y = s.Float, s.Float
-	s.Pt = s.F32.Round()
-	if s.Half != nil {
-		s.Half.Scale(factor)
+	f := float64(factor)
+	if !math.IsNaN(f) && !math.IsInf(f, 0) {
+		s.Float *= factor
+		s.Int = util.Round(s.Float)
+		s.F32.X, s.F32.Y = s.Float, s.Float
+		s.Pt = s.F32.Round()
+		if s.Half != nil {
+			s.Half.Scale(factor)
+		}
 	}
 }
 
@@ -73,6 +77,10 @@ func (s Size) Eq(other Size) bool {
 	s.Half = nil
 	other.Half = nil
 	return s == other
+}
+
+func (s Size) IsZero() bool {
+	return s.Eq(Size{})
 }
 
 func (s Size) String() string {

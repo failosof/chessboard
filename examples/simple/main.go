@@ -30,6 +30,8 @@ func main() {
 }
 
 func draw(window *app.Window) error {
+	th := material.NewTheme()
+
 	config, err := chessboard.NewConfig("assets/board/brown.png", "assets/pieces/aquarium")
 	if err != nil {
 		return err
@@ -37,10 +39,9 @@ func draw(window *app.Window) error {
 
 	config.ShowHints = true
 	config.ShowLastMove = true
+	config.Coordinates = chessboard.OutsideCoordinates
 
-	board := chessboard.NewWidget(config)
-
-	th := material.NewTheme()
+	board := chessboard.NewWidget(th, config)
 
 	var frameCount int
 	var fps float64
@@ -80,15 +81,15 @@ func draw(window *app.Window) error {
 					return layout.Flex{}.Layout(
 						gtx,
 						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							return layout.UniformInset(unit.Dp(20)).Layout(gtx, board.Layout)
-						}),
-						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 							return layout.UniformInset(unit.Dp(20)).Layout(
 								gtx,
 								func(gtx layout.Context) layout.Dimensions {
 									return material.H4(th, fmt.Sprintf("FPS: %.2f", fps)).Layout(gtx)
 								},
 							)
+						}),
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							return layout.UniformInset(unit.Dp(20)).Layout(gtx, board.Layout)
 						}),
 					)
 				},
