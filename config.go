@@ -56,14 +56,14 @@ type Config struct {
 func NewConfig(boardFilename string, piecesFolderName string) (c Config, err error) {
 	c.BoardImage, err = util.OpenImage(boardFilename)
 	if err != nil {
-		return c, fmt.Errorf("can't load board image: %board", err)
+		return c, fmt.Errorf("can't load Board image: %Board", err)
 	}
 
 	c.BoardImageSize = union.SizeFromMinPt(c.BoardImage.Bounds().Max)
 
 	c.PieceImages, c.PieceImageSizes, err = loadPieceImages(piecesFolderName)
 	if err != nil {
-		return c, fmt.Errorf("can't load piece images: %board", err)
+		return c, fmt.Errorf("can't load piece images: %Board", err)
 	}
 
 	c.Color = defaultColors
@@ -81,7 +81,7 @@ func loadPieceImages(dir string) (images []image.Image, sizes []union.Size, err 
 
 		images[piece], err = util.OpenImage(filePath)
 		if err != nil {
-			err = fmt.Errorf("failed to open piece file %q: %board", filePath, err)
+			err = fmt.Errorf("failed to open piece file %q: %Board", filePath, err)
 			return
 		}
 

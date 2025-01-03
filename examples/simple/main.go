@@ -12,6 +12,7 @@ import (
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
+	"gioui.org/widget"
 	"gioui.org/widget/material"
 	"github.com/failosof/chessboard"
 	"github.com/failosof/chessboard/util"
@@ -60,6 +61,8 @@ func draw(window *app.Window) error {
 		}
 	}()
 
+	flipBtn := new(widget.Clickable)
+
 	var ops op.Ops
 	for {
 		switch e := window.Event().(type) {
@@ -68,6 +71,9 @@ func draw(window *app.Window) error {
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
 			gtx.Execute(op.InvalidateCmd{})
+			if flipBtn.Clicked(gtx) {
+				board.Flip(gtx)
+			}
 			layout.Background{}.Layout(
 				gtx,
 				func(gtx layout.Context) layout.Dimensions {
@@ -78,14 +84,31 @@ func draw(window *app.Window) error {
 					})
 				},
 				func(gtx layout.Context) layout.Dimensions {
-					return layout.Flex{}.Layout(
+					return layout.Flex{
+						Axis: layout.Horizontal,
+					}.Layout(
 						gtx,
 						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							return layout.UniformInset(unit.Dp(20)).Layout(
+							return layout.Flex{
+								Axis: layout.Vertical,
+							}.Layout(
 								gtx,
-								func(gtx layout.Context) layout.Dimensions {
-									return material.H4(th, fmt.Sprintf("FPS: %.2f", fps)).Layout(gtx)
-								},
+								layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+									return layout.UniformInset(unit.Dp(20)).Layout(
+										gtx,
+										func(gtx layout.Context) layout.Dimensions {
+											return material.H4(th, fmt.Sprintf("FPS: %.2f", fps)).Layout(gtx)
+										},
+									)
+								}),
+								layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+									return layout.UniformInset(unit.Dp(20)).Layout(
+										gtx,
+										func(gtx layout.Context) layout.Dimensions {
+											return material.Button(th, flipBtn, "Flip").Layout(gtx)
+										},
+									)
+								}),
 							)
 						}),
 						layout.Rigid(func(gtx layout.Context) layout.Dimensions {

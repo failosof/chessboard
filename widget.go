@@ -21,7 +21,8 @@ import (
 	"github.com/notnil/chess"
 )
 
-// todo: add coordinates
+// todo: add inside coordinates
+// todo: add each square coordinates
 // todo: add pawn promotion
 // todo: add flip support
 // todo: animations
@@ -31,13 +32,13 @@ type Widget struct {
 
 	config Config
 
-	curWidgetSize  union.Size
-	prevWidgetSize union.Size
-	curBoardSize   union.Size
-	prevBoardSize  union.Size
-	squareSize     union.Size
-	hintSize       union.Size
-	pointerSize    union.Size
+	redraw bool
+
+	curBoardSize  union.Size
+	prevBoardSize union.Size
+	squareSize    union.Size
+	hintSize      union.Size
+	pointerSize   union.Size
 
 	buttonPressed pointer.Buttons
 	modifiersUsed key.Modifiers
@@ -60,7 +61,9 @@ type Widget struct {
 	selectedSquare chess.Square
 	selectedPiece  chess.Piece
 
+	flipped      bool
 	game         *chess.Game
+	curPosition  *chess.Position
 	prevPosition *chess.Position
 
 	mu sync.Mutex
@@ -84,22 +87,13 @@ func NewWidget(th *material.Theme, config Config) *Widget {
 }
 
 func (w *Widget) Layout(gtx layout.Context) layout.Dimensions {
-	w.curWidgetSize = union.SizeFromMinPt(gtx.Constraints.Max)
-	if w.prevWidgetSize.IsZero() {
-		w.prevWidgetSize = w.curWidgetSize
-	}
-
-	defer func() { w.prevWidgetSize = w.curWidgetSize }()
-
-	if w.config.Coordinates == OutsideCoordinates {
-		resizeFactor := w.curWidgetSize.Float / w.prevWidgetSize.Float
-		return OutsideCoordinatesStyle{
-			th:       w.th,
-			fontSize: 16 * resizeFactor,
-			board:    w.layout,
-		}.Layout(gtx)
-	}
-	return w.layout(gtx)
+	return CoordinatesStyle{
+		Type:     w.config.Coordinates,
+		Theme:    w.th,
+		FontSize: 16,
+		Flipped:  w.flipped,
+		Board:    w.layout,
+	}.Layout(gtx)
 }
 
 func (w *Widget) layout(gtx layout.Context) layout.Dimensions {
@@ -107,14 +101,21 @@ func (w *Widget) layout(gtx layout.Context) layout.Dimensions {
 	defer w.mu.Unlock()
 
 	w.curBoardSize = union.SizeFromMinPt(gtx.Constraints.Max)
+	w.curPosition = w.game.Position()
+	w.redraw = w.redraw || !w.curBoardSize.Eq(w.prevBoardSize) || w.positionChanged()
+	defer func() {
+		w.redraw = false
+		w.prevBoardSize = w.curBoardSize
+		w.prevPosition = w.curPosition
+	}()
 
-	if w.resized() {
+	if w.redraw {
 		w.squareSize = union.SizeFromFloat(w.curBoardSize.Float / 8)
 		w.hintSize = union.SizeFromMinF32(w.squareSize.F32.Div(3))
 		w.draggingPos = union.PointFromF32(w.draggingPos.F32)
 
 		for square := chess.A1; square <= chess.H8; square++ {
-			w.squareOrigins[square] = union.PointFromF32(util.SquareToPoint(square, w.squareSize.Float))
+			w.squareOrigins[square] = union.PointFromF32(util.SquareToPoint(square, w.squareSize.Float, w.flipped))
 		}
 
 		cache := new(op.Ops)
@@ -137,14 +138,13 @@ func (w *Widget) layout(gtx layout.Context) layout.Dimensions {
 		}
 	}
 
-	curPosition := w.game.Position()
-	if w.selectedSquare != chess.NoSquare && w.selectedPiece.Color() == curPosition.Turn() {
+	if w.selectedSquare != chess.NoSquare && w.selectedPiece.Color() == w.curPosition.Turn() {
 		w.markSquare(gtx, w.selectedSquare, util.GrayColor)
 		if w.config.ShowHints {
-			for _, move := range curPosition.ValidMoves() {
+			for _, move := range w.curPosition.ValidMoves() {
 				if move.S1() == w.selectedSquare {
 					position := w.squareOrigins[move.S2()]
-					if curPosition.Board().Piece(move.S2()) == chess.NoPiece {
+					if w.curPosition.Board().Piece(move.S2()) == chess.NoPiece {
 						origin := position.F32.Add(w.squareSize.Half.F32).Sub(w.hintSize.Half.F32).Round()
 						util.DrawEllipse(gtx.Ops, util.Rect(origin, w.hintSize.Pt), w.config.Color.Hint)
 					} else {
@@ -160,13 +160,10 @@ func (w *Widget) layout(gtx layout.Context) layout.Dimensions {
 
 	for _, anno := range w.annotations {
 		anno.Width = union.SizeFromFloat(w.squareSize.Float / 7)
-		anno.Draw(gtx, w.squareOrigins, w.squareSize, w.resized())
+		anno.Draw(gtx, w.squareOrigins, w.squareSize, w.redraw)
 	}
 	w.drawingAnno.Width = union.SizeFromFloat(w.squareSize.Float / 9)
 	w.drawingAnno.Draw(gtx, w.squareOrigins, w.squareSize, w.drawingAnno.Type != NoAnno)
-
-	w.prevPosition = w.game.Position()
-	w.prevBoardSize = w.curBoardSize
 
 	for {
 		ev, ok := gtx.Event(pointer.Filter{
@@ -228,12 +225,17 @@ func (w *Widget) SetGame(game *chess.Game) {
 	w.game = game
 }
 
-func (w *Widget) resized() bool {
-	return !w.curBoardSize.Eq(w.prevBoardSize)
+func (w *Widget) Flip(gtx layout.Context) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.flipped = !w.flipped
+	w.redraw = true
+	gtx.Execute(op.InvalidateCmd{})
 }
 
 func (w *Widget) positionChanged() bool {
-	return w.prevPosition != nil && w.prevPosition.Hash() != w.game.Position().Hash()
+	return w.prevPosition != nil && w.prevPosition.Hash() != w.curPosition.Hash()
 }
 
 func (w *Widget) drawPieces(gtx layout.Context) {
@@ -241,13 +243,12 @@ func (w *Widget) drawPieces(gtx layout.Context) {
 		return
 	}
 
-	curPosition := w.game.Position()
-	if w.resized() || w.positionChanged() {
+	if w.redraw {
 		clear(w.squareDrawingOps)
 		var wg sync.WaitGroup
 		for square := chess.A1; square <= chess.H8; square++ {
 			origin := w.squareOrigins[square]
-			if piece := curPosition.Board().Piece(square); piece != chess.NoPiece {
+			if piece := w.curPosition.Board().Piece(square); piece != chess.NoPiece {
 				wg.Add(1)
 				go func(square chess.Square, piece chess.Piece) {
 					defer wg.Done()
@@ -290,7 +291,7 @@ func (w *Widget) drawPieces(gtx layout.Context) {
 }
 
 func (w *Widget) processPrimaryButtonClick(gtx layout.Context, e pointer.Event) {
-	hoveredSquare := util.PointToSquare(e.Position, w.squareSize.Float)
+	hoveredSquare := util.PointToSquare(e.Position, w.squareSize.Float, w.flipped)
 	if hoveredSquare == chess.NoSquare {
 		return
 	}
@@ -335,7 +336,7 @@ func (w *Widget) processPrimaryButtonClick(gtx layout.Context, e pointer.Event) 
 }
 
 func (w *Widget) processSecondaryButtonClick(gtx layout.Context, e pointer.Event) {
-	hoveredSquare := util.PointToSquare(e.Position, w.squareSize.Float)
+	hoveredSquare := util.PointToSquare(e.Position, w.squareSize.Float, w.flipped)
 	defer gtx.Execute(op.InvalidateCmd{At: gtx.Now.Add(time.Second / 30)})
 
 	switch e.Kind {
@@ -396,7 +397,7 @@ func (w *Widget) processPrimaryButtonDragging(gtx layout.Context, e pointer.Even
 
 func (w *Widget) processSecondaryButtonDragging(gtx layout.Context, e pointer.Event) {
 	if w.drawingAnno.Type != NoAnno {
-		hoveredSquare := util.PointToSquare(e.Position, w.squareSize.Float)
+		hoveredSquare := util.PointToSquare(e.Position, w.squareSize.Float, w.flipped)
 		if hoveredSquare != chess.NoSquare {
 			if w.dragID == e.PointerID {
 				w.drawingAnno.End = hoveredSquare
