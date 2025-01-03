@@ -16,6 +16,7 @@ import (
 	"gioui.org/widget/material"
 	"github.com/failosof/chessboard"
 	"github.com/failosof/chessboard/util"
+	"github.com/notnil/chess"
 )
 
 func main() {
@@ -42,7 +43,10 @@ func draw(window *app.Window) error {
 	config.ShowLastMove = true
 	config.Coordinates = chessboard.OutsideCoordinates
 
+	pos, err := chess.FEN("8/1k2KP2/8/8/8/8/8/8 w - - 0 1")
+
 	board := chessboard.NewWidget(th, config)
+	board.SetGame(chess.NewGame(pos))
 
 	var frameCount int
 	var fps float64

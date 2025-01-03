@@ -24,7 +24,6 @@ import (
 // todo: add inside coordinates
 // todo: add each square coordinates
 // todo: add pawn promotion
-// todo: add flip support
 // todo: animations
 
 type Widget struct {
@@ -358,15 +357,13 @@ func (w *Widget) processSecondaryButtonClick(gtx layout.Context, e pointer.Event
 		}
 
 		i := slices.IndexFunc(w.annotations, func(annotation *Annotation) bool {
-			if w.drawingAnno.Type == NoAnno {
-				return annotation.Start == hoveredSquare
+			if w.drawingAnno.Type != annotation.Type {
+				return false
+			}
+			if w.drawingAnno.Type == ArrowAnno {
+				return annotation.Start == w.drawingAnno.Start && annotation.End == w.drawingAnno.End
 			} else {
-				if w.drawingAnno.Type == ArrowAnno {
-					return annotation.Type == ArrowAnno &&
-						annotation.Start == w.drawingAnno.Start && annotation.End == w.drawingAnno.End
-				} else {
-					return annotation.Start == w.drawingAnno.Start
-				}
+				return annotation.Start == w.drawingAnno.Start
 			}
 		})
 
