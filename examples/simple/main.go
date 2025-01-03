@@ -43,10 +43,10 @@ func draw(window *app.Window) error {
 	config.ShowLastMove = true
 	config.Coordinates = chessboard.OutsideCoordinates
 
-	pos, err := chess.FEN("8/1k2KP2/8/8/8/8/8/8 w - - 0 1")
+	pos, err := chess.FEN("8/PPPPPPPP/8/8/8/8/8/3K2k1 w - - 0 1")
 
 	board := chessboard.NewWidget(th, config)
-	board.SetGame(chess.NewGame(pos))
+	board.SetGame(chess.NewGame(pos, chess.UseNotation(chess.UCINotation{})))
 
 	var frameCount int
 	var fps float64

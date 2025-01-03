@@ -41,16 +41,20 @@ var (
 	}
 )
 
+type Piece struct {
+	Images []image.Image
+	Sizes  []union.Size
+}
+
 type Config struct {
-	ShowHints       bool
-	ShowLastMove    bool
-	Color           Color
-	AnimationSpeed  time.Duration
-	Coordinates     Coordinates
-	BoardImage      image.Image
-	BoardImageSize  union.Size
-	PieceImages     []image.Image
-	PieceImageSizes []union.Size
+	ShowHints      bool
+	ShowLastMove   bool
+	Color          Color
+	AnimationSpeed time.Duration
+	Coordinates    Coordinates
+	BoardImage     image.Image
+	BoardImageSize union.Size
+	Piece          Piece
 }
 
 func NewConfig(boardFilename string, piecesFolderName string) (c Config, err error) {
@@ -61,7 +65,7 @@ func NewConfig(boardFilename string, piecesFolderName string) (c Config, err err
 
 	c.BoardImageSize = union.SizeFromMinPt(c.BoardImage.Bounds().Max)
 
-	c.PieceImages, c.PieceImageSizes, err = loadPieceImages(piecesFolderName)
+	c.Piece.Images, c.Piece.Sizes, err = loadPieceImages(piecesFolderName)
 	if err != nil {
 		return c, fmt.Errorf("can't load piece images: %Board", err)
 	}

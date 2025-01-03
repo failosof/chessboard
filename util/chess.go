@@ -36,6 +36,12 @@ func SquareToPoint(square chess.Square, size float32, flipped bool) f32.Point {
 	return f32.Pt(file*size, rank*size)
 }
 
+func IsPromotionMove(square chess.Square, piece chess.Piece) bool {
+	whitePromotes := piece.Color() == chess.White && square.Rank() == chess.Rank8
+	blackPromotes := piece.Color() == chess.Black && square.Rank() == chess.Rank1
+	return piece.Type() == chess.Pawn && (whitePromotes || blackPromotes)
+}
+
 func SquareColor(square chess.Square) chess.Color {
 	if ((square / 8) % 2) == (square % 2) {
 		return chess.Black

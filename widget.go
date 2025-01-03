@@ -1,10 +1,11 @@
 package chessboard
 
 import (
-	"fmt"
 	"image"
 	"image/color"
+	"log/slog"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,6 +65,7 @@ type Widget struct {
 	game         *chess.Game
 	curPosition  *chess.Position
 	prevPosition *chess.Position
+	promoteOn    chess.Square
 
 	mu sync.Mutex
 }
@@ -80,6 +82,7 @@ func NewWidget(th *material.Theme, config Config) *Widget {
 		selectedPiece:     chess.NoPiece,
 		annoType:          CircleAnno,
 		game:              chess.NewGame(chess.UseNotation(chess.UCINotation{})),
+		promoteOn:         chess.NoSquare,
 	}
 
 	return &w
@@ -184,6 +187,7 @@ func (w *Widget) layout(gtx layout.Context) layout.Dimensions {
 			case pointer.Press:
 				w.buttonPressed = e.Buttons
 				w.modifiersUsed = e.Modifiers
+				w.promoteOn = chess.NoSquare
 				fallthrough
 			default:
 				if w.buttonPressed == pointer.ButtonPrimary {
@@ -215,6 +219,19 @@ func (w *Widget) layout(gtx layout.Context) layout.Dimensions {
 		}
 	}
 
+	w.markSquare(gtx, w.promoteOn, util.GrayColor)
+	if w.promoteOn != chess.NoSquare {
+		Promotion{
+			Position:   w.squareOrigins[w.promoteOn],
+			SquareSize: w.squareSize,
+			Color:      w.selectedPiece.Color(),
+			Background: util.WhiteColor,
+			Piece:      w.config.Piece,
+			Flipped:    w.flipped,
+		}.Layout(gtx)
+		slog.Debug("draw promotion selection", "on", w.promoteOn)
+	}
+
 	return layout.Dimensions{Size: w.curBoardSize.Pt}
 }
 
@@ -228,6 +245,8 @@ func (w *Widget) Flip(gtx layout.Context) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	w.putSelectedPieceBack(gtx)
+	w.unselectPiece(gtx)
 	w.flipped = !w.flipped
 	w.redraw = true
 	gtx.Execute(op.InvalidateCmd{})
@@ -251,10 +270,10 @@ func (w *Widget) drawPieces(gtx layout.Context) {
 				wg.Add(1)
 				go func(square chess.Square, piece chess.Piece) {
 					defer wg.Done()
-					factor := w.squareSize.F32.Div(w.config.PieceImageSizes[piece].Float)
+					factor := w.squareSize.F32.Div(w.config.Piece.Sizes[piece].Float)
 					cache := new(op.Ops)
 					squareMacro := op.Record(cache)
-					util.DrawImage(cache, w.config.PieceImages[piece], origin.Pt, factor)
+					util.DrawImage(cache, w.config.Piece.Images[piece], origin.Pt, factor)
 					ops := squareMacro.Stop()
 					w.squareDrawingOps[square] = &ops
 				}(square, piece)
@@ -282,9 +301,9 @@ func (w *Widget) drawPieces(gtx layout.Context) {
 		}
 	}
 
-	if w.selectedSquare != chess.NoSquare {
-		img := w.config.PieceImages[w.selectedPiece]
-		factor := w.squareSize.F32.Div(w.config.PieceImageSizes[w.selectedPiece].Float)
+	if w.selectedSquare != chess.NoSquare && w.promoteOn == chess.NoSquare {
+		img := w.config.Piece.Images[w.selectedPiece]
+		factor := w.squareSize.F32.Div(w.config.Piece.Sizes[w.selectedPiece].Float)
 		util.DrawImage(gtx.Ops, img, w.draggingPos.Pt, factor)
 	}
 }
@@ -316,13 +335,28 @@ func (w *Widget) processPrimaryButtonClick(gtx layout.Context, e pointer.Event) 
 			return
 		}
 
-		if w.selectedSquare != chess.NoSquare {
-			if err := w.moveSelectedPieceTo(hoveredSquare); err != nil {
-				w.putSelectedPieceBack(gtx)
-				if hoveredPiece != chess.NoPiece {
-					w.selectPiece(gtx, e, hoveredPiece, hoveredSquare)
-					return
+		if w.selectedSquare != chess.NoSquare && w.selectedPiece != chess.NoPiece {
+			move := w.selectedSquare.String() + hoveredSquare.String()
+			for _, validMove := range w.game.ValidMoves() {
+				if strings.HasPrefix(validMove.String(), move) {
+					if util.IsPromotionMove(hoveredSquare, w.selectedPiece) {
+						w.promoteOn = hoveredSquare
+						gtx.Execute(op.InvalidateCmd{})
+						return
+					}
+
+					if err := w.game.MoveStr(move); err != nil {
+						slog.Error("can't make move", "err", err)
+						w.putSelectedPieceBack(gtx)
+					}
+
+					break
 				}
+			}
+
+			if hoveredPiece != chess.NoPiece {
+				w.selectPiece(gtx, e, hoveredPiece, hoveredSquare)
+				return
 			}
 		}
 
@@ -441,6 +475,7 @@ func (w *Widget) unselectPiece(gtx layout.Context) {
 		w.draggingPos = w.squareOrigins[w.selectedSquare]
 	}
 
+	w.promoteOn = chess.NoSquare
 	w.selectedSquare = chess.NoSquare
 	w.selectedPiece = chess.NoPiece
 	w.dragID = 0
@@ -455,15 +490,6 @@ func (w *Widget) getLastMove() (m *chess.Move) {
 		m = moves[len(moves)-1]
 	}
 	return
-}
-
-func (w *Widget) moveSelectedPieceTo(to chess.Square) error {
-	if w.selectedSquare == chess.NoSquare {
-		return fmt.Errorf("no square selected")
-	} else {
-		move := w.selectedSquare.String() + to.String()
-		return w.game.MoveStr(move)
-	}
 }
 
 func (w *Widget) markSquare(gtx layout.Context, square chess.Square, color color.NRGBA) {
